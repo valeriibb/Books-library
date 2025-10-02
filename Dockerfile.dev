@@ -1,4 +1,4 @@
-# Dockerfile
+# Dockerfile.dev
 FROM node:18-alpine
 
 WORKDIR /app
@@ -16,9 +16,6 @@ RUN npx prisma generate
 # Копіюємо вихідний код
 COPY . .
 
-# Збираємо TypeScript
-RUN npm run build
-
 EXPOSE 5000
 
-CMD ["npm", "run", "start"]
+CMD ["npm", "run", "dev"]

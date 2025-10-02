@@ -4,7 +4,8 @@ import { registerSchema, loginSchema } from '../dto/auth.dto';
 
 const authService = new AuthService();
 
-// ------------------- РЕЄСТРАЦІЯ -------------------
+
+
 export const register = async (req: Request, res: Response) => {
     try {
       const { error, value } = registerSchema.validate(req.body);
@@ -15,7 +16,6 @@ export const register = async (req: Request, res: Response) => {
         });
       }
 
-      // Используем правильный метод register вместо registerUser
       const result = await authService.register(value);
 
       if (!result.success) {
@@ -34,7 +34,8 @@ export const register = async (req: Request, res: Response) => {
     }
 };
 
-// ------------------- ЛОГІН -------------------
+
+
 export const login = async (req: Request, res: Response) => {
     try {
       const { error, value } = loginSchema.validate(req.body);
@@ -92,7 +93,7 @@ export const refresh = async (req: Request, res: Response) => {
     }
 };
 
-// ------------------- ЛОГАУТ -------------------
+
 export const logout = async (req: Request, res: Response) => {
     try {
         const { refreshToken } = req.body; 

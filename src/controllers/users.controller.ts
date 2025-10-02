@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
 import { UsersService } from '../services/users.service';
 import { updateProfileSchema } from '../dto/users.dto';
+import { UnauthorizedError, ValidationError, BadRequestError } from '../utils/apiError';
+import { asyncHandler } from '../middleware/errorHandler';
 
 const usersService = new UsersService();
 
-// Додайте кастомний інтерфейс для Request
 interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
@@ -14,110 +15,68 @@ interface AuthenticatedRequest extends Request {
 }
 
 export class UsersController {
-  async getCurrentUser(req: AuthenticatedRequest, res: Response) {
-    try {
-      const userId = req.user?.id;
-      
-      if (!userId) {
-        return res.status(401).json({
-          success: false,
-          message: 'User not authenticated'
-        });
-      }
-
-      const result = await usersService.getCurrentUser(userId);
-
-      if (!result.success) {
-        return res.status(404).json(result);
-      }
-
-      return res.json(result);
-    } catch (error) {
-      console.error('Get current user controller error:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+  getCurrentUser = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      throw new UnauthorizedError('User not authenticated');
     }
-  }
 
-  async updateProfile(req: AuthenticatedRequest, res: Response) {
-    try {
-      const userId = req.user?.id;
-      
-      if (!userId) {
-        return res.status(401).json({
-          success: false,
-          message: 'User not authenticated'
-        });
-      }
+    const result = await usersService.getCurrentUser(userId);
 
-      // Validate input data
-      const { error, value } = updateProfileSchema.validate(req.body);
-      if (error) {
-        return res.status(400).json({
-          success: false,
-          message: error.details[0]?.message || 'Validation error'
-        });
-      }
-
-      // Check if at least one field is provided
-      if (Object.keys(value).length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'At least one field must be provided for update'
-        });
-      }
-
-      const result = await usersService.updateUserProfile(userId, value);
-
-      if (!result.success) {
-        return res.status(400).json(result);
-      }
-
-      return res.json(result);
-    } catch (error) {
-      console.error('Update profile controller error:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+    if (!result.success) {
+      throw new BadRequestError(result.message);
     }
-  }
 
-  async changePassword(req: AuthenticatedRequest, res: Response) {
-    try {
-      const userId = req.user?.id;
-      
-      if (!userId) {
-        return res.status(401).json({
-          success: false,
-          message: 'User not authenticated'
-        });
-      }
+    res.json(result);
+  });
 
-      const { currentPassword, newPassword } = req.body;
-
-      if (!currentPassword || !newPassword) {
-        return res.status(400).json({
-          success: false,
-          message: 'Current password and new password are required'
-        });
-      }
-
-      const result = await usersService.changePassword(userId, currentPassword, newPassword);
-
-      if (!result.success) {
-        return res.status(400).json(result);
-      }
-
-      return res.json(result);
-    } catch (error) {
-      console.error('Change password controller error:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+  updateProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      throw new UnauthorizedError('User not authenticated');
     }
-  }
+
+    // Validate input data
+    const { error, value } = updateProfileSchema.validate(req.body);
+    if (error) {
+      throw new ValidationError(error.details[0]?.message || 'Validation error');
+    }
+
+    // Check if at least one field is provided
+    if (Object.keys(value).length === 0) {
+      throw new BadRequestError('At least one field must be provided for update');
+    }
+
+    const result = await usersService.updateUserProfile(userId, value);
+
+    if (!result.success) {
+      throw new BadRequestError(result.message);
+    }
+
+    res.json(result);
+  });
+
+  changePassword = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      throw new UnauthorizedError('User not authenticated');
+    }
+
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      throw new BadRequestError('Current password and new password are required');
+    }
+
+    const result = await usersService.changePassword(userId, currentPassword, newPassword);
+
+    if (!result.success) {
+      throw new BadRequestError(result.message);
+    }
+
+    res.json(result);
+  });
 }

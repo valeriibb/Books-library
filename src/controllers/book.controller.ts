@@ -1,154 +1,137 @@
+// src/controllers/book.controller.ts
 import { Request, Response } from 'express';
-import { BooksService } from '../services/books.service';
-import { createBookSchema, updateBookSchema, bookQuerySchema } from '../dto/books.dto';
+import { BookRepository } from '../repositories/book.repository';
+import { CreateBookDto, UpdateBookDto } from '../types/books';
+// Note: Avoid direct Prisma error class references for compatibility
 
-const booksService = new BooksService();
+const bookRepository = new BookRepository();
 
-export class BooksController {
-  async getAllBooks(req: Request, res: Response) {
-    try {
-      // Валидация query параметров
-      const { error, value } = bookQuerySchema.validate(req.query);
-      if (error) {
-        return res.status(400).json({
-          success: false,
-          message: error.details[0]?.message || 'Invalid query parameters'
-        });
-      }
+export class BookController {
 
-      const result = await booksService.getAllBooks(value);
+    // POST /api/books
+    public async createBook(req: Request, res: Response): Promise<Response> {
+        try {
+            const data: CreateBookDto = req.body;
+            
+            // Базова валідація
+            if (!data.title || !data.authorId || !data.categoryId || !data.totalCopies) {
+                return res.status(400).json({ error: 'Missing required fields: title, authorId, categoryId, totalCopies' });
+            }
 
-      if (!result.success) {
-        return res.status(400).json(result);
-      }
-
-      return res.json(result);
-    } catch (error) {
-      console.error('Get all books controller error:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+            const newBook = await bookRepository.create({
+                title: data.title,
+                description: data.description,
+                isbn: data.isbn,
+                coverImage: data.coverImage,
+                publicationYear: data.publicationYear,
+                publisher: data.publisher,
+                language: data.language,
+                pages: data.pages,
+                totalCopies: data.totalCopies,
+                availableCopies: data.totalCopies,
+                authorId: data.authorId,
+                categoryId: data.categoryId,
+                genreIds: data.genreIds,
+            });
+            return res.status(201).json(newBook);
+        } catch (error: unknown) {
+            console.error('Create book error:', error);
+            // Обробка помилок унікальності (наприклад, ISBN)
+            if (typeof (error as any)?.code === 'string' && (error as any).code === 'P2002') {
+                return res.status(409).json({ error: 'Book with this ISBN already exists.' });
+            }
+            return res.status(500).json({ error: 'Failed to create book.' });
+        }
     }
-  }
 
-  async getBookById(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
+    // GET /api/books/:id
+    public async getBookById(req: Request, res: Response): Promise<Response> {
+        try {
+            const id = req.params.id as string;
+            const book = await bookRepository.findById(id);
 
-      // Проверка что ID существует
-      if (!id) {
-        return res.status(400).json({
-          success: false,
-          message: 'Book ID is required'
-        });
-      }
+            if (!book) {
+                return res.status(404).json({ error: 'Book not found' });
+            }
 
-      const result = await booksService.getBookById(id);
-
-      if (!result.success) {
-        return res.status(404).json(result);
-      }
-
-      return res.json(result);
-    } catch (error) {
-      console.error('Get book by ID controller error:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+            return res.status(200).json(book);
+        } catch (error: unknown) {
+            console.error('Get book error:', error);
+            return res.status(500).json({ error: 'Failed to retrieve book.' });
+        }
     }
-  }
 
-  async createBook(req: Request, res: Response) {
-    try {
-      // Валидация тела запроса
-      const { error, value } = createBookSchema.validate(req.body);
-      if (error) {
-        return res.status(400).json({
-          success: false,
-          message: error.details[0]?.message || 'Validation error'
-        });
-      }
+    // GET /api/books
+    public async getAllBooks(req: Request, res: Response): Promise<Response> {
+        try {
+            const {
+                page = '1',
+                limit = '10',
+                search,
+                author,
+                category,
+                genre,
+                status,
+                sortBy = 'title',
+                sortOrder = 'asc',
+            } = req.query as Record<string, string | undefined>;
 
-      const result = await booksService.createBook(value);
+            const books = await bookRepository.findAll({
+                page: Number(page),
+                limit: Number(limit),
+                search,
+                author,
+                category,
+                genre,
+                status: status as any,
+                sortBy,
+                sortOrder: (sortOrder === 'desc' ? 'desc' : 'asc'),
+            });
 
-      if (!result.success) {
-        return res.status(400).json(result);
-      }
-
-      return res.status(201).json(result);
-    } catch (error) {
-      console.error('Create book controller error:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+            return res.status(200).json(books);
+        } catch (error: unknown) {
+            console.error('Get all books error:', error);
+            return res.status(500).json({ error: 'Failed to retrieve books list.' });
+        }
     }
-  }
 
-  async updateBook(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
+    // PUT /api/books/:id
+    public async updateBook(req: Request, res: Response): Promise<Response> {
+        try {
+            const id = req.params.id as string;
+            const data: UpdateBookDto = req.body;
 
-      // Проверка что ID существует
-      if (!id) {
-        return res.status(400).json({
-          success: false,
-          message: 'Book ID is required'
-        });
-      }
-
-      // Валидация тела запроса
-      const { error, value } = updateBookSchema.validate(req.body);
-      if (error) {
-        return res.status(400).json({
-          success: false,
-          message: error.details[0]?.message || 'Validation error'
-        });
-      }
-
-      const result = await booksService.updateBook(id, value);
-
-      if (!result.success) {
-        return res.status(400).json(result);
-      }
-
-      return res.json(result);
-    } catch (error) {
-      console.error('Update book controller error:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+            const updatedBook = await bookRepository.update(id, data);
+            
+            return res.status(200).json(updatedBook);
+        } catch (error: unknown) {
+            console.error('Update book error:', error);
+            if (typeof (error as any)?.code === 'string') {
+                const code = (error as any).code as string;
+                if (code === 'P2002') return res.status(409).json({ error: 'Book with this ISBN already exists.' });
+                if (code === 'P2025') return res.status(404).json({ error: 'Book or related record not found.' });
+            }
+            return res.status(500).json({ error: 'Failed to update book.' });
+        }
     }
-  }
 
-  async deleteBook(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-
-      // Проверка что ID существует
-      if (!id) {
-        return res.status(400).json({
-          success: false,
-          message: 'Book ID is required'
-        });
-      }
-
-      const result = await booksService.deleteBook(id);
-
-      if (!result.success) {
-        return res.status(400).json(result);
-      }
-
-      return res.json(result);
-    } catch (error) {
-      console.error('Delete book controller error:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Internal server error'
-      });
+    // DELETE /api/books/:id
+    public async deleteBook(req: Request, res: Response): Promise<Response> {
+        try {
+            const id = req.params.id as string;
+            const deletedBook = await bookRepository.delete(id);
+            
+            return res.status(200).json({ 
+                message: `Book "${deletedBook.title}" successfully deleted.`,
+                id: deletedBook.id
+            });
+        } catch (error: unknown) {
+            console.error('Delete book error:', error);
+            if (typeof (error as any)?.code === 'string' && (error as any).code === 'P2025') {
+                return res.status(404).json({ error: 'Book not found.' });
+            }
+            return res.status(500).json({ error: 'Failed to delete book.' });
+        }
     }
-  }
 }
+

@@ -3,15 +3,16 @@ import { RegisterInput, LoginInput, AuthResponse, JwtPayload } from '../types/au
 import * as bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
 import jwt, { Secret } from "jsonwebtoken";
+import env from '../config/environment';
 
 const prisma = new PrismaClient();
 const userRepository = new UserRepository();
 
 export class AuthService {
-  private readonly JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-  private readonly JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
-  private readonly REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET || 'refresh-secret-key';
-  private readonly REFRESH_TOKEN_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
+  private readonly JWT_SECRET = env.JWT_ACCESS_SECRET;
+  private readonly JWT_EXPIRES_IN = 15 * 60; // seconds
+  private readonly REFRESH_TOKEN_SECRET = env.JWT_REFRESH_SECRET;
+  private readonly REFRESH_TOKEN_EXPIRES_IN = 7 * 24 * 60 * 60; // seconds
 
   async register(userData: RegisterInput): Promise<AuthResponse> {
     try {
@@ -180,8 +181,8 @@ export class AuthService {
       role: user.role
     };
     
-            const accessToken = jwt.sign(payload, this.JWT_SECRET, { expiresIn: 15 * 60 }); // 15 минут
-    const refreshToken = jwt.sign(payload, this.REFRESH_TOKEN_SECRET, { expiresIn: 7 * 24 * 60 * 60 }); // 7 дней
+            const accessToken = jwt.sign(payload, this.JWT_SECRET, { expiresIn: this.JWT_EXPIRES_IN });
+    const refreshToken = jwt.sign(payload, this.REFRESH_TOKEN_SECRET, { expiresIn: this.REFRESH_TOKEN_EXPIRES_IN });
     return { accessToken, refreshToken };
   }
   
